@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Noto Sans SC", "Segoe UI", Roboto, sans-serif;
+  }
+
+  *, *::before, *::after {
+    font-family: var(--font-family) !important;
+  }
+
+  body {
+    font-family: var(--font-family) !important;
+    background-color: #FFF8F5;
+    color: #4A4450;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  input, button, select, textarea {
+    font-family: inherit;
+  }
+
+  .font-mono, [class*="font-mono"] {
+    /* 数字/金额等宽字体，避免表格中数字抖动 */
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, var(--font-family) !important;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+}
+
+/* Custom soft scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FFF8F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #EEDCD5;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #D9C3BA;
+}
+
+

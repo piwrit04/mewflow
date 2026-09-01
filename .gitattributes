@@ -1,0 +1,4 @@
+# 统一行尾：文本文件按平台自动转换，bat 脚本保持 CRLF
+* text=auto
+*.bat text eol=crlf
+*.cmd text eol=crlf
