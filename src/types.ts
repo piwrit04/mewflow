@@ -61,10 +61,6 @@ export interface OrderFilterOptions {
   status?: OrderStatus | 'all';
   platform?: PlatformType | 'all';
   server?: ServerType | 'all';
+  /** 仅统计今天完成（按 updatedAt）的已完成订单 */
+  completedToday?: boolean;
 }
-
-export type OrderViewMode = 
-  | { view: 'list' }
-  | { view: 'new' }
-  | { view: 'detail'; orderId: string }
-  | { view: 'edit'; orderId: string };

@@ -39,6 +39,7 @@ interface DashboardPageProps {
 export const DashboardPage: React.FC<DashboardPageProps> = ({ username, onLogout }) => {
   const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
   const [initialOrderStatusFilter, setInitialOrderStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [initialTodayFilter, setInitialTodayFilter] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Modal State for New / Edit Order
@@ -94,6 +95,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ username, onLogout
     } else if (tabId === 'orders') {
       setActiveTab('orders');
       setInitialOrderStatusFilter('all');
+      setInitialTodayFilter(false);
     } else {
       addToast(`${tabLabel}功能还在准备中哦～`);
     }
@@ -109,9 +111,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ username, onLogout
     setIsOrderModalOpen(true);
   };
 
-  const handleStatCardClick = (statusFilter?: OrderStatus) => {
+  const handleStatCardClick = (statusFilter?: OrderStatus, todayOnly = false) => {
     setActiveTab('orders');
     setInitialOrderStatusFilter(statusFilter || 'all');
+    setInitialTodayFilter(todayOnly);
   };
 
   return (
@@ -148,6 +151,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ username, onLogout
           >
             <OrdersListPage
               initialStatusFilter={initialOrderStatusFilter}
+              initialTodayFilter={initialTodayFilter}
               refreshKey={ordersListRefreshKey}
               onCreateNew={handleOpenCreateModal}
               onEditOrder={handleOpenEditModal}
@@ -270,7 +274,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ username, onLogout
               >
                 <Card
                   className="p-4 sm:p-5 hover:border-[#CCEED6] transition-colors cursor-pointer border-[#F4E9E4] group rounded-3xl shadow-xs"
-                  onClick={() => handleStatCardClick('completed')}
+                  onClick={() => handleStatCardClick('completed', true)}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold text-[#5A5260]">今日已完成</span>

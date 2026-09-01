@@ -44,6 +44,7 @@ import { orderRepository } from '../../repositories';
 import {
   formatCurrency,
   formatNTEOrderNo,
+  formatShortDateTime,
   PLATFORM_LABELS,
   ORDER_STATUS_LABELS,
 } from '../../services/settlementService';
@@ -83,25 +84,12 @@ const PAGE_SIZE_OPTIONS: SelectOption<number>[] = [
 
 interface OrdersListPageProps {
   initialStatusFilter?: OrderStatus | 'all';
+  /** 从工作台「今日已完成」卡片进入时，仅展示今日完成的订单 */
+  initialTodayFilter?: boolean;
   refreshKey?: number;
   onCreateNew: () => void;
   onEditOrder: (orderId: string) => void;
   onToast: (text: string) => void;
-}
-
-function formatShortDateTime(isoString: string | undefined): string {
-  if (!isoString) return '-';
-  try {
-    const date = new Date(isoString);
-    if (isNaN(date.getTime())) return isoString;
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    const hh = String(date.getHours()).padStart(2, '0');
-    const mm = String(date.getMinutes()).padStart(2, '0');
-    return `${m}-${d} ${hh}:${mm}`;
-  } catch {
-    return isoString;
-  }
 }
 
 const PlatformBadge: React.FC<{ platform: PlatformType }> = ({ platform }) => {
@@ -128,6 +116,7 @@ const PlatformBadge: React.FC<{ platform: PlatformType }> = ({ platform }) => {
 
 export const OrdersListPage: React.FC<OrdersListPageProps> = ({
   initialStatusFilter = 'all',
+  initialTodayFilter = false,
   refreshKey,
   onCreateNew,
   onEditOrder,
@@ -142,6 +131,8 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType | 'all'>('all');
   const [selectedServer, setSelectedServer] = useState<ServerType | 'all'>('all');
+  // 「今日已完成」限定：从工作台统计卡进入时开启
+  const [completedTodayOnly, setCompletedTodayOnly] = useState(initialTodayFilter);
 
   // Batch Selection State
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -168,14 +159,15 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
   const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Sync initialStatusFilter from props
+  // Sync initialStatusFilter / initialTodayFilter from props
   useEffect(() => {
     if (initialStatusFilter) {
       setSelectedStatus(initialStatusFilter);
       // 从工作台统计卡进入时，默认展示普通订单 TAB
       setActiveTypeTab('standard');
     }
-  }, [initialStatusFilter]);
+    setCompletedTodayOnly(!!initialTodayFilter);
+  }, [initialStatusFilter, initialTodayFilter]);
 
   // 弹窗（备份/还原、批量删除）支持 Escape 关闭
   useEffect(() => {
@@ -199,6 +191,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
         status: selectedStatus,
         platform: selectedPlatform,
         server: selectedServer,
+        completedToday: completedTodayOnly || undefined,
       };
 
       const result = await orderRepository.getAll(filter);
@@ -292,6 +285,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
     setSelectedStatus('all');
     setSelectedPlatform('all');
     setSelectedServer('all');
+    setCompletedTodayOnly(false);
     setSelectedOrderIds([]);
   };
 
@@ -307,7 +301,8 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
     searchTerm.trim() !== '' ||
     selectedStatus !== 'all' ||
     selectedPlatform !== 'all' ||
-    selectedServer !== 'all';
+    selectedServer !== 'all' ||
+    completedTodayOnly;
 
   // Batch Selection Handlers
   // Derive per-type lists from the full (non-type-filtered) result, so the
@@ -638,6 +633,11 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
                 共 <b className="text-[#4A4450] font-bold">{currentTypeOrders.length}</b> 笔
                 {activeTypeTab === 'hosting' ? '托管' : '普通'}订单
               </span>
+              {completedTodayOnly && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EFFBF2] text-[#2F855A] border border-[#BCE8C9]">
+                  今日完成
+                </span>
+              )}
               {selectedOrderIds.length > 0 && (
                 <span className="text-[#FF5277] font-bold">(已选 {selectedOrderIds.length} 笔)</span>
               )}
@@ -655,6 +655,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="搜索单号 (#NTE...)、客户、手机、需求或备注"
+              aria-label="搜索订单"
               className="w-full h-10 pl-9 pr-8 bg-[#FFFFFF] border border-[#F4E9E4] focus:border-[#FF5277] focus:bg-[#FFFFFF] rounded-2xl text-xs sm:text-sm text-[#4A4450] placeholder-[#B5ABB9] outline-none transition-[box-shadow,border-color,background-color] shadow-2xs focus-visible:ring-2 focus-visible:ring-[#FF5277]/30"
             />
             {searchTerm && (
@@ -674,7 +675,11 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
             <Select
               options={STATUS_OPTIONS}
               value={selectedStatus}
-              onChange={(v) => setSelectedStatus(v as OrderStatus | 'all')}
+              onChange={(v) => {
+                setSelectedStatus(v as OrderStatus | 'all');
+                // 切换到非「已完成」状态时，自动退出「今日完成」限定
+                if (v !== 'completed') setCompletedTodayOnly(false);
+              }}
               className="w-full"
               size="sm"
             />

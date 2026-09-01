@@ -13,12 +13,20 @@ import {
 import { calculateSettlement, formatNTEOrderNo } from '../../services/settlementService';
 import { generateSeedOrders } from './seedData';
 
+// 首次启动自动填充示例数据的标记。用 localStorage 而非“订单数为 0”判断，
+// 避免用户删光所有订单后示例数据又自动“复活”。
+const SEED_FLAG_KEY = 'mewflow_seed_done';
+
 export class DexieOrderRepository implements IOrderRepository {
   private hasCheckedSeed = false;
 
   private async ensureInitialSeed(): Promise<void> {
     if (this.hasCheckedSeed) return;
     this.hasCheckedSeed = true;
+
+    // 已初始化过（或用户主动清空过数据）则不再自动填充
+    if (localStorage.getItem(SEED_FLAG_KEY)) return;
+
     const currentCount = await db.orders.count();
     if (currentCount <= 1) {
       const seeds = generateSeedOrders();
@@ -29,6 +37,7 @@ export class DexieOrderRepository implements IOrderRepository {
         }
       }
     }
+    localStorage.setItem(SEED_FLAG_KEY, '1');
   }
 
   async seedSampleData(): Promise<void> {
@@ -38,13 +47,32 @@ export class DexieOrderRepository implements IOrderRepository {
     }
   }
 
-  private generateOrderNo(): string {
+  private async generateOrderNo(): Promise<string> {
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
-    const randomSeq = String(Math.floor(1 + Math.random() * 99)).padStart(2, '0');
-    return `#NTE${yy}${mm}${dd}${randomSeq}`;
+    const datePrefix = `${yy}${mm}${dd}`;
+
+    // 取今天已存在的最大序号，避免同日创建时随机撞号（orderNo 非主键，撞号不会报错但会显示重复）
+    let maxSeq = 0;
+    try {
+      const todayOrders = await db.orders
+        .where('orderNo')
+        .startsWith(`#NTE${datePrefix}`)
+        .toArray();
+      for (const o of todayOrders) {
+        const match = /#NTE\d{6}(\d+)$/.exec(o.orderNo);
+        if (match) {
+          maxSeq = Math.max(maxSeq, parseInt(match[1], 10));
+        }
+      }
+    } catch {
+      // 索引查询失败时退回时间戳序号，保证流程不中断
+    }
+
+    const seq = String(maxSeq + 1).padStart(2, '0');
+    return `#NTE${datePrefix}${seq}`;
   }
 
   async getAll(filter?: OrderFilterOptions): Promise<Order[]> {
@@ -109,6 +137,14 @@ export class DexieOrderRepository implements IOrderRepository {
         list = list.filter((o) => o.status === filter.status);
       }
 
+      if (filter.completedToday) {
+        const todayStr = new Date().toDateString();
+        list = list.filter((o) => {
+          if (o.status !== 'completed') return false;
+          return new Date(o.updatedAt || o.createdAt).toDateString() === todayStr;
+        });
+      }
+
       if (filter.platform && filter.platform !== 'all') {
         list = list.filter((o) => o.platform === filter.platform);
       }
@@ -129,7 +165,7 @@ export class DexieOrderRepository implements IOrderRepository {
   async create(dto: CreateOrderDTO): Promise<Order> {
     const now = new Date().toISOString();
     const id = `order_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const orderNo = this.generateOrderNo();
+    const orderNo = await this.generateOrderNo();
 
     const isTransferred = !!dto.isTransferred;
     const settlement = calculateSettlement({
