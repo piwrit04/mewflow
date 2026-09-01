@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 *.local
+
+# 本地开发工具（pi agent 技能与项目规则），不对外公开
+.pi/
+AGENTS.md
